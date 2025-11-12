@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lorcana TCG Simulator</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+</head>
+<body>
+    <div id="game-container">
+        <!-- Top Bar -->
+        <div id="top-bar">
+            <div id="game-info">
+                <span id="turn-info">Turn: <span id="turn-number">1</span></span>
+                <span id="current-player">Current: <span id="current-player-name">-</span></span>
+            </div>
+            <div id="controls">
+                <button id="shuffle-btn">Shuffle Deck</button>
+                <button id="draw-btn">Draw Card</button>
+                <button id="end-turn-btn">End Turn</button>
+            </div>
+        </div>
+
+        <!-- Opponent Area (will be dynamic for multiple opponents) -->
+        <div id="opponents-area">
+            <!-- Opponent boards will be inserted here -->
+        </div>
+
+        <!-- Your Play Area -->
+        <div id="your-area" class="player-area">
+            <div class="player-header">
+                <h2 id="your-name">Your Board</h2>
+                <div class="lore-counter">
+                    Lore: <span id="your-lore">0</span> / 20
+                </div>
+            </div>
+
+            <!-- Ready Zone -->
+            <div class="zone-container">
+                <div class="zone-label">Ready Characters</div>
+                <div id="ready-zone" class="card-zone ready-zone"></div>
+            </div>
+
+            <!-- Summoning Zone -->
+            <div class="zone-container">
+                <div class="zone-label">Summoning (Drying)</div>
+                <div id="summoning-zone" class="card-zone summoning-zone"></div>
+            </div>
+
+            <!-- Piles Area -->
+            <div id="piles-area">
+                <div class="pile" id="deck-pile" onclick="showDeckOptions()">
+                    <div class="pile-label">Deck</div>
+                    <div class="pile-count" id="deck-count">0</div>
+                    <div class="card-back"></div>
+                </div>
+
+                <div class="pile" id="mystery-pile" onclick="showMysteryOptions()">
+                    <div class="pile-label">Mystery</div>
+                    <div class="pile-count" id="mystery-count">0</div>
+                    <div class="card-back"></div>
+                </div>
+
+                <div class="pile" id="discard-pile" onclick="showDiscardPile()">
+                    <div class="pile-label">Discard</div>
+                    <div class="pile-count" id="discard-count">0</div>
+                    <div class="card-back discard-back"></div>
+                </div>
+
+                <div class="pile" id="ink-pile" onclick="showInkPile()">
+                    <div class="pile-label">Ink</div>
+                    <div class="pile-count" id="ink-count">0</div>
+                    <div class="card-back ink-back"></div>
+                </div>
+            </div>
+
+            <!-- Hand -->
+            <div class="zone-container">
+                <div class="zone-label">Your Hand</div>
+                <div id="hand-zone" class="card-zone hand-zone"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Context Menu -->
+    <div id="context-menu" class="context-menu hidden">
+        <!-- Options will be dynamically inserted -->
+    </div>
+
+    <!-- Modal for viewing piles -->
+    <div id="pile-modal" class="modal hidden">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <h2 id="modal-title">Cards</h2>
+            <div id="modal-cards" class="modal-cards"></div>
+        </div>
+    </div>
+
+    <!-- Loading Screen -->
+    <div id="loading" class="loading">
+        <h2>Loading Game...</h2>
+        <p>Fetching cards from Lorcana API...</p>
+    </div>
+
+    <script src="/static/game.js"></script>
+</body>
+</html>
