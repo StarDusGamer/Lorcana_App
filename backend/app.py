@@ -1,10 +1,14 @@
 from flask import Flask, render_template, jsonify, request, session
 from flask_socketio import SocketIO, emit, join_room
 import uuid
+import os
 from game_state import GameState
 from lorcana_api import LorcanaAPI
 
-app = Flask(__name__)
+app = Flask(__name__, 
+            template_folder='../UI',
+            static_folder='../UI',
+            static_url_path='/static')
 app.config['SECRET_KEY'] = 'your-secret-key-here'
 socketio = SocketIO(app, cors_allowed_origins="*")
 

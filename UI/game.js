@@ -96,7 +96,7 @@ function createCardElement(card) {
     
     // Add card image
     if (card.image_url) {
-        cardDiv.style.backgroundImage = `url(${card.image_url})`;
+        cardDiv.style.backgroundImage = 'url(' + card.image_url + ')';
     } else {
         // Fallback for cards without images
         cardDiv.innerHTML = '<div class="card-back">?</div>';
@@ -143,8 +143,8 @@ function showCardMenu(card, x, y) {
     });
     
     // Position menu
-    menu.style.left = `${x}px`;
-    menu.style.top = `${y}px`;
+    menu.style.left = x + 'px';
+    menu.style.top = y + 'px';
     menu.classList.remove('hidden');
 }
 
@@ -300,20 +300,3 @@ function hideContextMenu() {
 document.getElementById('context-menu').addEventListener('click', (e) => {
     e.stopPropagation();
 });
-```
-
----
-
-## 🎉 That's all the files!
-
-Here's your complete file structure:
-```
-github/
-├── backend/
-│   ├── app.py
-│   ├── game_state.py
-│   └── lorcana_api.py
-└── UI/
-    ├── game.html
-    ├── style.css
-    └── game.js
