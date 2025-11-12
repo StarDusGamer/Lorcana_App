@@ -273,4 +273,55 @@ class LorcanaAPI:
                     main_name = main_name.strip()
                     subtitle = subtitle.strip()
                 else:
-                    #
+                    # Action/Item card without subtitle
+                    main_name = full_name.strip()
+                    subtitle = None
+                
+                # Fetch card from API
+                if subtitle:
+                    card_data = self.search_card(main_name, subtitle)
+                else:
+                    card_data = self.search_card_no_subtitle(main_name)
+                
+                if card_data:
+                    # Add card count times
+                    for _ in range(count):
+                        cards.append(card_data)
+                    
+                    if card_data.get('mock'):
+                        print(f"Added {count}x {main_name}" + (f" - {subtitle}" if subtitle else "") + " (MOCK)")
+                    else:
+                        print(f"Added {count}x {main_name}" + (f" - {subtitle}" if subtitle else ""))
+                else:
+                    print(f"Could not find card: {main_name}" + (f" - {subtitle}" if subtitle else ""))
+                    # Add a placeholder card so deck doesn't break
+                    for _ in range(count):
+                        cards.append({
+                            'name': main_name,
+                            'subtitle': subtitle or '',
+                            'image_url': MOCK_CARD_IMAGES['action'],
+                            'error': True
+                        })
+                    
+            except ValueError as e:
+                print(f"Error parsing line: {line} - {e}")
+                continue
+        
+        return cards
+
+
+if __name__ == "__main__":
+    # Test with your deck
+    api = LorcanaAPI()
+    
+    test_deck = """
+2 Rapunzel - Gifted with Healing
+3 Stitch - Carefree Surfer
+2 Be Our Guest
+"""
+    
+    cards = api.parse_dreamborn_deck(test_deck)
+    print(f"\nLoaded {len(cards)} cards")
+    for card in cards[:3]:
+        print(f"  - {card.get('name')} - {card.get('subtitle', 'N/A')}")
+        print(f"    Image: {card.get('image_url')}")
