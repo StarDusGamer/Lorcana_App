@@ -7,13 +7,25 @@ let socket = null;
 // Initialize game on load
 window.addEventListener('DOMContentLoaded', async () => {
     try {
+        console.log('Fetching test game...');
+        
         // Initialize test game
         const response = await fetch('/test_game');
+        
+        if (!response.ok) {
+            throw new Error('Failed to fetch test game: ' + response.status);
+        }
+        
         const data = await response.json();
+        console.log('Test game data received:', data);
         
         gameId = data.game_id;
         playerId = data.player_id;
         gameState = data.state;
+        
+        console.log('Game ID:', gameId);
+        console.log('Player ID:', playerId);
+        console.log('Game State:', gameState);
         
         // Initialize socket connection
         socket = io();
@@ -23,12 +35,18 @@ window.addEventListener('DOMContentLoaded', async () => {
             socket.emit('join_game', { game_id: gameId, player_id: playerId });
         });
         
+        socket.on('game_joined', () => {
+            console.log('Successfully joined game');
+        });
+        
         socket.on('game_update', (newState) => {
+            console.log('Game update received');
             gameState = newState;
             renderGame();
         });
         
         socket.on('error', (data) => {
+            console.error('Game error:', data);
             alert(data.message);
         });
         
@@ -38,7 +56,11 @@ window.addEventListener('DOMContentLoaded', async () => {
         
     } catch (error) {
         console.error('Error initializing game:', error);
-        alert('Failed to load game. Check console for details.');
+        document.getElementById('loading').innerHTML = `
+            <h2>Error Loading Game</h2>
+            <p style="color: #f44336;">${error.message}</p>
+            <p>Check the console for details (F12)</p>
+        `;
     }
 });
 
