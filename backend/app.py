@@ -61,7 +61,20 @@ def test_game():
     
     # Create game
     game = GameState(game_id)
-    game.add_player(player_id, "Test Player", deck_cards)
+    
+    # Add main player (you)
+    game.add_player(player_id, "You", deck_cards)
+    
+    # Add 2 more players for testing (3 player game)
+    opponent1_id = str(uuid.uuid4())
+    opponent1_deck = lorcana_api.parse_dreamborn_deck(SAMPLE_DECK)
+    game.add_player(opponent1_id, "Player 2", opponent1_deck)
+    
+    opponent2_id = str(uuid.uuid4())
+    opponent2_deck = lorcana_api.parse_dreamborn_deck(SAMPLE_DECK)
+    game.add_player(opponent2_id, "Player 3", opponent2_deck)
+    
+    # Start game
     game.start_game()
     
     games[game_id] = game
@@ -75,7 +88,6 @@ def test_game():
         'player_id': player_id,
         'state': game.get_state_for_player(player_id)
     })
-
 
 @app.route('/game_state')
 def get_game_state():
