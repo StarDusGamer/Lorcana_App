@@ -39,6 +39,7 @@ class Player:
         self.id = player_id
         self.username = username
         self.lore = 0
+        self.has_inked_this_turn = False  # ADD THIS LINE
         self.zones = {
             'deck': [],
             'hand': [],
@@ -57,6 +58,7 @@ class Player:
             'id': self.id,
             'username': self.username,
             'lore': self.lore,
+            'has_inked_this_turn': self.has_inked_this_turn,  # ADD THIS LINE
             'zone_counts': {
                 zone: len(cards) for zone, cards in self.zones.items()
             },
@@ -226,6 +228,9 @@ class GameState:
         # Dry all ink (flip face down)
         for card_id in player.zones['ink']:
             self.cards[card_id].face_up = False
+        
+        # Reset ink flag
+        player.has_inked_this_turn = False  # ADD THIS LINE
         
         # Move to next player
         current_idx = self.player_order.index(player_id)

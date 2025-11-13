@@ -155,11 +155,19 @@ def handle_ink_card(data):
     if game.cards[card_id].owner != player_id:
         return
     
-    game.ink_card(card_id)
+    # Check if player has already inked this turn
+    player = game.players[player_id]
+    if player.has_inked_this_turn:
+        emit('error', {'message': 'You have already inked a card this turn'})
+        return
     
-    for pid in game.players:
-        emit('game_update', game.get_state_for_player(pid), room=game_id)
-
+    success = game.ink_card(card_id)
+    
+    if success:
+        for pid in game.players:
+            emit('game_update', game.get_state_for_player(pid), room=game_id)
+    else:
+        emit('error', {'message': 'Cannot ink card'})
 
 @socketio.on('play_card')
 def handle_play_card(data):

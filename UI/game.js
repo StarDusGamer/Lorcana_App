@@ -216,7 +216,7 @@ function renderZone(zoneId, cardIds, isYourCard) {
     
     zoneElement.innerHTML = '';
     
-    if (!cardIds) return;
+    if (!cardIds || !Array.isArray(cardIds)) return;
     
     cardIds.forEach(cardId => {
         const card = gameState.my_cards[cardId];
@@ -226,7 +226,6 @@ function renderZone(zoneId, cardIds, isYourCard) {
         zoneElement.appendChild(cardElement);
     });
 }
-
 // Render opponent's visible zone
 function renderOpponentZone(zoneId, opponentId, zoneName) {
     const zoneElement = document.getElementById(zoneId);
@@ -329,11 +328,17 @@ function showCardMenu(card, x, y) {
 // Get available options for a card based on its zone and state
 function getCardOptions(card) {
     const options = [];
+    const myPlayer = gameState.players[playerId];
     
     switch (card.zone) {
         case 'hand':
             options.push({ label: 'Play Card', action: () => playCard(card.id) });
-            options.push({ label: 'Ink Card', action: () => inkCard(card.id) });
+            
+            // Only show ink option if haven't inked this turn
+            if (!myPlayer.has_inked_this_turn) {
+                options.push({ label: 'Ink Card', action: () => inkCard(card.id) });
+            }
+            
             options.push({ label: 'Discard', action: () => moveCard(card.id, 'discard') });
             break;
             
@@ -356,6 +361,17 @@ function getCardOptions(card) {
             
         case 'summoning':
             options.push({ label: 'Move to Ready', action: () => moveCard(card.id, 'ready') });
+            options.push({ label: 'Add Damage', action: () => addDamage(card.id) });
+            if (card.damage > 0) {
+                options.push({ label: 'Remove Damage', action: () => removeDamage(card.id) });
+            }
+            options.push({ label: 'Move to Hand', action: () => moveCard(card.id, 'hand') });
+            options.push({ label: 'Move to Discard', action: () => moveCard(card.id, 'discard') });
+            break;
+    }
+    
+    return options;
+}            options.push({ label: 'Move to Ready', action: () => moveCard(card.id, 'ready') });
             options.push({ label: 'Add Damage', action: () => addDamage(card.id) });
             if (card.damage > 0) {
                 options.push({ label: 'Remove Damage', action: () => removeDamage(card.id) });
