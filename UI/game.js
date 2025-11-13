@@ -73,13 +73,24 @@ function renderYourBoard() {
     const yourArea = document.getElementById('your-area');
     const myPlayer = gameState.players[playerId];
     
-    yourArea.innerHTML = '<div class="player-header"><h2>' + myPlayer.username + '</h2><div class="lore-counter">Lore: <span id="your-lore">' + myPlayer.lore + '</span> / 20</div></div><div class="zones-container"><div class="zone-container"><div class="zone-label">Ready Characters</div><div id="ready-zone" class="card-zone ready-zone"></div></div><div class="zone-container"><div class="zone-label">Summoning (Drying)</div><div id="summoning-zone" class="card-zone summoning-zone"></div></div><div id="piles-area"><div class="pile" onclick="showDeckOptions()"><div class="pile-label">Deck</div><div class="pile-count">' + myPlayer.zone_counts.deck + '</div><div class="card-back"></div></div><div class="pile" onclick="showMysteryOptions()"><div class="pile-label">Mystery</div><div class="pile-count">' + myPlayer.zone_counts.mystery + '</div><div class="card-back"></div></div><div class="pile" onclick="showDiscardPile()"><div class="pile-label">Discard</div><div class="pile-count">' + myPlayer.zone_counts.discard + '</div><div class="card-back discard-back"></div></div><div class="pile" onclick="showInkPile()"><div class="pile-label">Ink</div><div class="pile-count">' + myPlayer.zone_counts.ink + '</div><div class="card-back ink-back"></div></div></div><div class="zone-container"><div class="zone-label">Your Hand</div><div id="hand-zone" class="card-zone hand-zone"></div></div></div>';
+    // Always rebuild to avoid state issues
+    yourArea.innerHTML = '<div class="player-header"><h2>' + myPlayer.username + '</h2><div class="lore-counter">Lore: <span id="your-lore">' + myPlayer.lore + '</span> / 20</div></div><div class="zones-container"><div class="zone-container"><div class="zone-label">Ready Characters</div><div id="ready-zone" class="card-zone ready-zone"></div></div><div class="zone-container"><div class="zone-label">Summoning (Drying)</div><div id="summoning-zone" class="card-zone summoning-zone"></div></div><div id="piles-area"></div><div class="zone-container"><div class="zone-label">Your Hand</div><div id="hand-zone" class="card-zone hand-zone"></div></div></div>';
     
+    // Build piles area
+    const pilesArea = document.getElementById('piles-area');
+    pilesArea.innerHTML = '<div class="pile"><div class="pile-label">Deck</div><div class="pile-count">' + myPlayer.zone_counts.deck + '</div><div class="card-back"></div></div><div class="pile"><div class="pile-label">Mystery</div><div class="pile-count">' + myPlayer.zone_counts.mystery + '</div><div class="card-back"></div></div><div class="pile"><div class="pile-label">Discard</div><div class="pile-count">' + myPlayer.zone_counts.discard + '</div><div class="card-back discard-back"></div></div><div class="pile"><div class="pile-label">Ink</div><div class="pile-count">' + myPlayer.zone_counts.ink + '</div><div class="card-back ink-back"></div></div>';
+    
+    // Add click handlers to piles
+    pilesArea.children[0].onclick = showDeckOptions;
+    pilesArea.children[1].onclick = showMysteryOptions;
+    pilesArea.children[2].onclick = showDiscardPile;
+    pilesArea.children[3].onclick = showInkPile;
+    
+    // Render zones
     renderZone('hand-zone', myPlayer.zones.hand, true);
     renderZone('ready-zone', myPlayer.zones.ready, true);
     renderZone('summoning-zone', myPlayer.zones.summoning, true);
 }
-
 function renderOpponentBoards() {
     const opponentsArea = document.getElementById('opponents-area');
     opponentsArea.innerHTML = '';
@@ -104,19 +115,37 @@ function renderOpponentBoards() {
 
 function renderZone(zoneId, cardIds, isYourCard) {
     const zoneElement = document.getElementById(zoneId);
-    if (!zoneElement) return;
+    if (!zoneElement) {
+        console.error('Zone element not found:', zoneId);
+        return;
+    }
     
     zoneElement.innerHTML = '';
     
-    if (!cardIds || !Array.isArray(cardIds)) return;
+    console.log('Rendering zone:', zoneId, 'with cards:', cardIds);
+    
+    if (!cardIds) {
+        console.warn('No cardIds provided for zone:', zoneId);
+        return;
+    }
+    
+    if (!Array.isArray(cardIds)) {
+        console.error('cardIds is not an array for zone:', zoneId, 'got:', typeof cardIds, cardIds);
+        return;
+    }
     
     cardIds.forEach(cardId => {
         const card = gameState.my_cards[cardId];
-        if (!card) return;
+        if (!card) {
+            console.warn('Card not found in my_cards:', cardId);
+            return;
+        }
         
         const cardElement = createCardElement(card, isYourCard);
         zoneElement.appendChild(cardElement);
     });
+    
+    console.log('Zone', zoneId, 'rendered with', zoneElement.children.length, 'cards');
 }
 
 function renderOpponentZone(zoneId, opponentId, zoneName) {

@@ -7,7 +7,7 @@ class Card:
     """Represents a single card instance in the game"""
     def __init__(self, card_data: Dict, owner_id: str):
         self.id = str(uuid.uuid4())
-        self.card_data = card_data  # From API
+        self.card_data = card_data
         self.owner = owner_id
         self.zone = 'deck'
         self.face_up = False
@@ -17,7 +17,6 @@ class Card:
     
     def to_dict(self, viewer_id: str = None) -> Dict:
         """Convert to dictionary for JSON serialization"""
-        # Determine what viewer can see
         can_see_face = self.face_up or (viewer_id == self.owner and self.zone == 'hand')
         
         return {
@@ -39,7 +38,7 @@ class Player:
         self.id = player_id
         self.username = username
         self.lore = 0
-        self.has_inked_this_turn = False  # ADD THIS LINE
+        self.has_inked_this_turn = False
         self.zones = {
             'deck': [],
             'hand': [],
@@ -58,7 +57,7 @@ class Player:
             'id': self.id,
             'username': self.username,
             'lore': self.lore,
-            'has_inked_this_turn': self.has_inked_this_turn,  # ADD THIS LINE
+            'has_inked_this_turn': self.has_inked_this_turn,
             'zone_counts': {
                 zone: len(cards) for zone, cards in self.zones.items()
             },
@@ -82,7 +81,6 @@ class GameState:
         self.players[player_id] = player
         self.player_order.append(player_id)
         
-        # Create card instances from deck data
         for card_data in deck_data:
             card = Card(card_data, player_id)
             self.cards[card.id] = card
@@ -92,35 +90,30 @@ class GameState:
     
     def start_game(self):
         """Initialize game - shuffle, set mystery card, draw hands"""
-        # Randomize turn order
         random.shuffle(self.player_order)
         self.current_turn = self.player_order[0]
         
         for player_id in self.player_order:
             player = self.players[player_id]
             
-            # Shuffle deck
             random.shuffle(player.zones['deck'])
             
-            # Set mystery card (top card)
             if player.zones['deck']:
                 mystery_card_id = player.zones['deck'].pop(0)
                 player.zones['mystery'] = [mystery_card_id]
                 self.cards[mystery_card_id].zone = 'mystery'
             
-            # Draw 7 cards
             for _ in range(7):
                 if player.zones['deck']:
                     card_id = player.zones['deck'].pop(0)
                     player.zones['hand'].append(card_id)
                     self.cards[card_id].zone = 'hand'
-                    self.cards[card_id].face_up = True  # Owner can see their hand
+                    self.cards[card_id].face_up = True
     
     def mulligan(self, player_id: str, card_ids: List[str]):
         """Mulligan specific cards - put back in deck, shuffle, redraw"""
         player = self.players[player_id]
         
-        # Move cards back to deck
         for card_id in card_ids:
             if card_id in player.zones['hand']:
                 player.zones['hand'].remove(card_id)
@@ -128,10 +121,8 @@ class GameState:
                 self.cards[card_id].zone = 'deck'
                 self.cards[card_id].face_up = False
         
-        # Shuffle deck
         random.shuffle(player.zones['deck'])
         
-        # Draw same number of cards
         for _ in range(len(card_ids)):
             if player.zones['deck']:
                 card_id = player.zones['deck'].pop(0)
@@ -145,28 +136,32 @@ class GameState:
         card = self.cards[card_id]
         player = self.players[card.owner]
         
-        # Remove from old zone
         if card_id in player.zones[card.zone]:
             player.zones[card.zone].remove(card_id)
         
-        # Add to new zone
         if position is not None and position < len(player.zones[to_zone]):
             player.zones[to_zone].insert(position, card_id)
         else:
             player.zones[to_zone].append(card_id)
         
-        # Update card state
         card.zone = to_zone
         if face_up is not None:
             card.face_up = face_up
         
-        # Reset exerted state when moving to certain zones
         if to_zone in ['hand', 'deck', 'discard', 'ink']:
             card.exerted = False
     
     def ink_card(self, card_id: str):
         """Ink a card - move to ink zone face up"""
+        card = self.cards[card_id]
+        player = self.players[card.owner]
+        
+        if player.has_inked_this_turn:
+            return False
+        
         self.move_card(card_id, 'ink', face_up=True)
+        player.has_inked_this_turn = True
+        return True
     
     def play_card(self, card_id: str):
         """Play a card from hand to summoning area"""
@@ -212,7 +207,6 @@ class GameState:
         player = self.players[player_id]
         if player.zones['mystery']:
             card_id = player.zones['mystery'][0]
-            # Move directly to ready area (not summoning)
             self.move_card(card_id, 'ready', face_up=True)
             self.cards[card_id].exerted = False
             return True
@@ -225,19 +219,15 @@ class GameState:
         
         player = self.players[player_id]
         
-        # Dry all ink (flip face down)
         for card_id in player.zones['ink']:
             self.cards[card_id].face_up = False
         
-        # Reset ink flag
-        player.has_inked_this_turn = False  # ADD THIS LINE
+        player.has_inked_this_turn = False
         
-        # Move to next player
         current_idx = self.player_order.index(player_id)
         next_idx = (current_idx + 1) % len(self.player_order)
         self.current_turn = self.player_order[next_idx]
         
-        # Increment turn counter when it cycles back to first player
         if next_idx == 0:
             self.turn_number += 1
         
