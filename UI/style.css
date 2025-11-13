@@ -12,9 +12,11 @@ body {
 }
 
 #game-container {
-    max-width: 1800px;
-    margin: 0 auto;
-    padding: 20px;
+    max-width: 100vw;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    padding: 10px;
 }
 
 /* Top Bar */
@@ -23,28 +25,29 @@ body {
     justify-content: space-between;
     align-items: center;
     background: rgba(0, 0, 0, 0.5);
-    padding: 15px 25px;
+    padding: 10px 20px;
     border-radius: 10px;
-    margin-bottom: 20px;
+    margin-bottom: 10px;
+    flex-shrink: 0;
 }
 
 #game-info {
-    font-size: 18px;
+    font-size: 16px;
 }
 
 #game-info span {
-    margin-right: 30px;
+    margin-right: 20px;
 }
 
 #controls button {
     background: #4CAF50;
     color: white;
     border: none;
-    padding: 10px 20px;
-    margin-left: 10px;
+    padding: 8px 16px;
+    margin-left: 8px;
     border-radius: 5px;
     cursor: pointer;
-    font-size: 14px;
+    font-size: 13px;
     transition: background 0.3s;
 }
 
@@ -60,38 +63,118 @@ body {
     background: #da190b;
 }
 
+/* Game Layout Container */
+#game-layout {
+    flex: 1;
+    display: flex;
+    gap: 10px;
+    min-height: 0;
+}
+
+/* 2 Player Layout - Vertical Split */
+#game-layout.players-2 {
+    flex-direction: column;
+}
+
+#game-layout.players-2 .player-area {
+    flex: 1;
+    min-height: 0;
+}
+
+/* 3 Player Layout - Triangle */
+#game-layout.players-3 {
+    flex-direction: column;
+}
+
+#game-layout.players-3 #opponents-area {
+    flex: 1;
+    display: flex;
+    gap: 10px;
+}
+
+#game-layout.players-3 #opponents-area .player-area {
+    flex: 1;
+}
+
+#game-layout.players-3 #your-area {
+    flex: 1;
+}
+
+/* 4 Player Layout - 2x2 Grid */
+#game-layout.players-4 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 10px;
+}
+
+#game-layout.players-4 .player-area {
+    min-height: 0;
+}
+
 /* Player Area */
 .player-area {
     background: rgba(0, 0, 0, 0.3);
-    border-radius: 15px;
-    padding: 20px;
-    margin-bottom: 20px;
+    border-radius: 10px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.player-area.opponent {
+    /* Opponents' cards face them (upside down to you) */
+    transform: rotate(180deg);
+}
+
+.player-area.opponent .card {
+    /* Flip cards back so they're readable to opponent */
+    transform: rotate(0deg);
+}
+
+.player-area.opponent .card.exerted {
+    /* Exerted cards for opponents */
+    transform: rotate(45deg);
 }
 
 .player-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 20px;
-    padding-bottom: 10px;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
     border-bottom: 2px solid rgba(255, 255, 255, 0.3);
+    flex-shrink: 0;
+}
+
+.player-header h2 {
+    font-size: 18px;
 }
 
 .lore-counter {
-    font-size: 24px;
+    font-size: 18px;
     font-weight: bold;
     color: #FFD700;
 }
 
-/* Zones */
+/* Compact Layout for Multiple Players */
+.zones-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-height: 0;
+    overflow-y: auto;
+}
+
 .zone-container {
-    margin-bottom: 20px;
+    flex-shrink: 0;
 }
 
 .zone-label {
-    font-size: 14px;
+    font-size: 11px;
     color: #aaa;
-    margin-bottom: 8px;
+    margin-bottom: 4px;
     text-transform: uppercase;
     letter-spacing: 1px;
 }
@@ -99,37 +182,66 @@ body {
 .card-zone {
     display: flex;
     flex-wrap: wrap;
-    gap: 15px;
-    min-height: 100px;
+    gap: 8px;
+    min-height: 60px;
     background: rgba(0, 0, 0, 0.2);
-    border-radius: 10px;
-    padding: 15px;
+    border-radius: 8px;
+    padding: 8px;
 }
 
 .hand-zone {
-    min-height: 250px;
+    min-height: 120px;
     justify-content: center;
 }
 
 .ready-zone, .summoning-zone {
-    min-height: 280px;
+    min-height: 140px;
+}
+
+/* Opponent zones - smaller */
+.player-area.opponent .card-zone {
+    min-height: 40px;
+    gap: 6px;
+    padding: 6px;
+}
+
+.player-area.opponent .ready-zone,
+.player-area.opponent .summoning-zone {
+    min-height: 80px;
+}
+
+.player-area.opponent .hand-zone {
+    min-height: 80px;
 }
 
 /* Cards */
 .card {
-    width: 180px;
-    height: 250px;
-    border-radius: 10px;
+    width: 120px;
+    height: 167px;
+    border-radius: 8px;
     cursor: pointer;
     transition: transform 0.3s, box-shadow 0.3s;
     position: relative;
     background-size: cover;
     background-position: center;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+    flex-shrink: 0;
+}
+
+/* Your cards - larger */
+#your-area .card {
+    width: 140px;
+    height: 195px;
+}
+
+/* Opponent cards - smaller */
+.player-area.opponent .card {
+    width: 90px;
+    height: 125px;
 }
 
 .card:hover {
-    transform: translateY(-10px) scale(1.05);
+    transform: translateY(-5px) scale(1.05);
     box-shadow: 0 8px 16px rgba(0, 0, 0, 0.7);
     z-index: 10;
 }
@@ -147,36 +259,36 @@ body {
     width: 100%;
     height: 100%;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    border-radius: 10px;
+    border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
     font-weight: bold;
-    font-size: 24px;
+    font-size: 20px;
 }
 
 .card-image {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    border-radius: 10px;
+    border-radius: 8px;
 }
 
 /* Damage Counter */
 .damage-counter {
     position: absolute;
-    top: 5px;
-    right: 5px;
+    top: 3px;
+    right: 3px;
     background: #f44336;
     color: white;
     border-radius: 50%;
-    width: 35px;
-    height: 35px;
+    width: 28px;
+    height: 28px;
     display: flex;
     align-items: center;
     justify-content: center;
     font-weight: bold;
-    font-size: 18px;
+    font-size: 14px;
     border: 2px solid white;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
 }
@@ -184,44 +296,58 @@ body {
 /* Piles Area */
 #piles-area {
     display: flex;
-    gap: 20px;
+    gap: 8px;
     justify-content: center;
-    margin: 20px 0;
+    margin: 8px 0;
+    flex-shrink: 0;
 }
 
 .pile {
-    width: 140px;
-    height: 190px;
+    width: 90px;
+    height: 125px;
     position: relative;
     cursor: pointer;
     transition: transform 0.3s;
+    flex-shrink: 0;
+}
+
+/* Your piles - larger */
+#your-area .pile {
+    width: 100px;
+    height: 139px;
+}
+
+/* Opponent piles - smaller */
+.player-area.opponent .pile {
+    width: 70px;
+    height: 97px;
 }
 
 .pile:hover {
-    transform: translateY(-5px);
+    transform: translateY(-3px);
 }
 
 .pile-label {
     position: absolute;
-    top: -25px;
+    top: -20px;
     left: 0;
     right: 0;
     text-align: center;
-    font-size: 14px;
+    font-size: 10px;
     font-weight: bold;
     text-transform: uppercase;
 }
 
 .pile-count {
     position: absolute;
-    top: 5px;
-    right: 5px;
+    top: 3px;
+    right: 3px;
     background: rgba(0, 0, 0, 0.8);
     color: white;
-    padding: 5px 10px;
-    border-radius: 15px;
+    padding: 3px 8px;
+    border-radius: 12px;
     font-weight: bold;
-    font-size: 16px;
+    font-size: 12px;
     z-index: 5;
 }
 
@@ -244,4 +370,129 @@ body {
     background: rgba(0, 0, 0, 0.95);
     border: 2px solid #4CAF50;
     border-radius: 8px;
-    pa
+    padding: 8px 0;
+    z-index: 1000;
+    min-width: 180px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.context-menu.hidden {
+    display: none;
+}
+
+.context-menu-item {
+    padding: 8px 16px;
+    cursor: pointer;
+    transition: background 0.2s;
+    color: white;
+    font-size: 13px;
+}
+
+.context-menu-item:hover {
+    background: rgba(76, 175, 80, 0.3);
+}
+
+.context-menu-item.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.context-menu-item.disabled:hover {
+    background: transparent;
+}
+
+/* Modal */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+}
+
+.modal.hidden {
+    display: none;
+}
+
+.modal-content {
+    background: #2a2a2a;
+    border-radius: 15px;
+    padding: 30px;
+    max-width: 90%;
+    max-height: 90%;
+    overflow-y: auto;
+    position: relative;
+}
+
+.close {
+    position: absolute;
+    top: 10px;
+    right: 20px;
+    font-size: 32px;
+    cursor: pointer;
+    color: #fff;
+}
+
+.close:hover {
+    color: #f44336;
+}
+
+.modal-cards {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    margin-top: 20px;
+}
+
+/* Loading Screen */
+.loading {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.9);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 3000;
+}
+
+.loading.hidden {
+    display: none;
+}
+
+.loading h2 {
+    font-size: 32px;
+    margin-bottom: 20px;
+}
+
+.loading p {
+    font-size: 16px;
+    color: #aaa;
+}
+
+/* Scrollbar Styling */
+.zones-container::-webkit-scrollbar {
+    width: 6px;
+}
+
+.zones-container::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 10px;
+}
+
+.zones-container::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 10px;
+}
+
+.zones-container::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.5);
+}

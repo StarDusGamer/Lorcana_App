@@ -42,35 +42,178 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
 });
 
-// Render the game state
+// Render the entire game
 function renderGame() {
     if (!gameState) return;
     
-    const myPlayer = gameState.players[playerId];
+    // Determine number of players and set layout
+    const numPlayers = Object.keys(gameState.players).length;
+    const gameLayout = document.getElementById('game-layout');
+    gameLayout.className = 'players-' + numPlayers;
     
     // Update turn info
     document.getElementById('turn-number').textContent = gameState.turn_number;
     const currentPlayerName = gameState.players[gameState.current_turn].username;
     document.getElementById('current-player-name').textContent = currentPlayerName;
     
-    // Update lore
-    document.getElementById('your-lore').textContent = myPlayer.lore;
+    // Render your board
+    renderYourBoard();
     
-    // Update zone counts
-    document.getElementById('deck-count').textContent = myPlayer.zone_counts.deck;
-    document.getElementById('mystery-count').textContent = myPlayer.zone_counts.mystery;
-    document.getElementById('discard-count').textContent = myPlayer.zone_counts.discard;
-    document.getElementById('ink-count').textContent = myPlayer.zone_counts.ink;
-    
-    // Render zones
-    renderZone('hand-zone', myPlayer.zones.hand);
-    renderZone('ready-zone', myPlayer.zones.ready);
-    renderZone('summoning-zone', myPlayer.zones.summoning);
+    // Render opponent boards
+    renderOpponentBoards();
 }
 
-// Render a specific zone
-function renderZone(zoneId, cardIds) {
+// Render your player board
+function renderYourBoard() {
+    const yourArea = document.getElementById('your-area');
+    const myPlayer = gameState.players[playerId];
+    
+    yourArea.innerHTML = `
+        <div class="player-header">
+            <h2>${myPlayer.username}</h2>
+            <div class="lore-counter">
+                Lore: <span id="your-lore">${myPlayer.lore}</span> / 20
+            </div>
+        </div>
+        
+        <div class="zones-container">
+            <!-- Ready Zone -->
+            <div class="zone-container">
+                <div class="zone-label">Ready Characters</div>
+                <div id="ready-zone" class="card-zone ready-zone"></div>
+            </div>
+
+            <!-- Summoning Zone -->
+            <div class="zone-container">
+                <div class="zone-label">Summoning (Drying)</div>
+                <div id="summoning-zone" class="card-zone summoning-zone"></div>
+            </div>
+
+            <!-- Piles Area -->
+            <div id="piles-area">
+                <div class="pile" onclick="showDeckOptions()">
+                    <div class="pile-label">Deck</div>
+                    <div class="pile-count">${myPlayer.zone_counts.deck}</div>
+                    <div class="card-back"></div>
+                </div>
+
+                <div class="pile" onclick="showMysteryOptions()">
+                    <div class="pile-label">Mystery</div>
+                    <div class="pile-count">${myPlayer.zone_counts.mystery}</div>
+                    <div class="card-back"></div>
+                </div>
+
+                <div class="pile" onclick="showDiscardPile()">
+                    <div class="pile-label">Discard</div>
+                    <div class="pile-count">${myPlayer.zone_counts.discard}</div>
+                    <div class="card-back discard-back"></div>
+                </div>
+
+                <div class="pile" onclick="showInkPile()">
+                    <div class="pile-label">Ink</div>
+                    <div class="pile-count">${myPlayer.zone_counts.ink}</div>
+                    <div class="card-back ink-back"></div>
+                </div>
+            </div>
+
+            <!-- Hand -->
+            <div class="zone-container">
+                <div class="zone-label">Your Hand</div>
+                <div id="hand-zone" class="card-zone hand-zone"></div>
+            </div>
+        </div>
+    `;
+    
+    // Render cards in zones
+    renderZone('hand-zone', myPlayer.zones.hand, true);
+    renderZone('ready-zone', myPlayer.zones.ready, true);
+    renderZone('summoning-zone', myPlayer.zones.summoning, true);
+}
+
+// Render opponent boards
+function renderOpponentBoards() {
+    const opponentsArea = document.getElementById('opponents-area');
+    opponentsArea.innerHTML = '';
+    
+    // Get all players except yourself
+    const opponentIds = Object.keys(gameState.players).filter(pid => pid !== playerId);
+    
+    opponentIds.forEach(opponentId => {
+        const opponent = gameState.players[opponentId];
+        const opponentDiv = document.createElement('div');
+        opponentDiv.className = 'player-area opponent';
+        opponentDiv.id = 'opponent-' + opponentId;
+        
+        opponentDiv.innerHTML = `
+            <div class="player-header">
+                <h2>${opponent.username}</h2>
+                <div class="lore-counter">
+                    Lore: ${opponent.lore} / 20
+                </div>
+            </div>
+            
+            <div class="zones-container">
+                <!-- Ready Zone -->
+                <div class="zone-container">
+                    <div class="zone-label">Ready Characters</div>
+                    <div id="opponent-ready-${opponentId}" class="card-zone ready-zone"></div>
+                </div>
+
+                <!-- Summoning Zone -->
+                <div class="zone-container">
+                    <div class="zone-label">Summoning (Drying)</div>
+                    <div id="opponent-summoning-${opponentId}" class="card-zone summoning-zone"></div>
+                </div>
+
+                <!-- Piles Area -->
+                <div class="piles-area">
+                    <div class="pile">
+                        <div class="pile-label">Deck</div>
+                        <div class="pile-count">${opponent.zone_counts.deck}</div>
+                        <div class="card-back"></div>
+                    </div>
+
+                    <div class="pile">
+                        <div class="pile-label">Mystery</div>
+                        <div class="pile-count">${opponent.zone_counts.mystery}</div>
+                        <div class="card-back"></div>
+                    </div>
+
+                    <div class="pile" onclick="showOpponentDiscard('${opponentId}')">
+                        <div class="pile-label">Discard</div>
+                        <div class="pile-count">${opponent.zone_counts.discard}</div>
+                        <div class="card-back discard-back"></div>
+                    </div>
+
+                    <div class="pile" onclick="showOpponentInk('${opponentId}')">
+                        <div class="pile-label">Ink</div>
+                        <div class="pile-count">${opponent.zone_counts.ink}</div>
+                        <div class="card-back ink-back"></div>
+                    </div>
+                </div>
+
+                <!-- Hand (back of cards only) -->
+                <div class="zone-container">
+                    <div class="zone-label">Hand</div>
+                    <div id="opponent-hand-${opponentId}" class="card-zone hand-zone"></div>
+                </div>
+            </div>
+        `;
+        
+        opponentsArea.appendChild(opponentDiv);
+        
+        // Render opponent's visible cards
+        renderOpponentZone('opponent-ready-' + opponentId, opponentId, 'ready');
+        renderOpponentZone('opponent-summoning-' + opponentId, opponentId, 'summoning');
+        renderOpponentHand('opponent-hand-' + opponentId, opponent.zone_counts.hand);
+    });
+}
+
+// Render a zone with your cards
+function renderZone(zoneId, cardIds, isYourCard) {
     const zoneElement = document.getElementById(zoneId);
+    if (!zoneElement) return;
+    
     zoneElement.innerHTML = '';
     
     if (!cardIds) return;
@@ -79,13 +222,46 @@ function renderZone(zoneId, cardIds) {
         const card = gameState.my_cards[cardId];
         if (!card) return;
         
-        const cardElement = createCardElement(card);
+        const cardElement = createCardElement(card, isYourCard);
         zoneElement.appendChild(cardElement);
     });
 }
 
+// Render opponent's visible zone
+function renderOpponentZone(zoneId, opponentId, zoneName) {
+    const zoneElement = document.getElementById(zoneId);
+    if (!zoneElement) return;
+    
+    zoneElement.innerHTML = '';
+    
+    // Get visible cards from this opponent
+    const visibleCards = Object.values(gameState.visible_cards || {}).filter(card => 
+        card.owner === opponentId && card.zone === zoneName
+    );
+    
+    visibleCards.forEach(card => {
+        const cardElement = createCardElement(card, false);
+        zoneElement.appendChild(cardElement);
+    });
+}
+
+// Render opponent's hand (card backs only)
+function renderOpponentHand(zoneId, cardCount) {
+    const zoneElement = document.getElementById(zoneId);
+    if (!zoneElement) return;
+    
+    zoneElement.innerHTML = '';
+    
+    for (let i = 0; i < cardCount; i++) {
+        const cardBack = document.createElement('div');
+        cardBack.className = 'card';
+        cardBack.innerHTML = '<div class="card-back">?</div>';
+        zoneElement.appendChild(cardBack);
+    }
+}
+
 // Create a card HTML element
-function createCardElement(card) {
+function createCardElement(card, isYourCard) {
     const cardDiv = document.createElement('div');
     cardDiv.className = 'card';
     cardDiv.dataset.cardId = card.id;
@@ -110,11 +286,13 @@ function createCardElement(card) {
         cardDiv.appendChild(damageCounter);
     }
     
-    // Add click handler
-    cardDiv.addEventListener('click', (e) => {
-        e.stopPropagation();
-        showCardMenu(card, e.clientX, e.clientY);
-    });
+    // Add click handler only for your cards
+    if (isYourCard) {
+        cardDiv.addEventListener('click', (e) => {
+            e.stopPropagation();
+            showCardMenu(card, e.clientX, e.clientY);
+        });
+    }
     
     return cardDiv;
 }
@@ -240,7 +418,6 @@ document.getElementById('end-turn-btn').addEventListener('click', () => {
 
 // Pile click actions
 function showDeckOptions() {
-    // For now, just draw a card
     socket.emit('draw_card', {});
 }
 
@@ -266,6 +443,22 @@ function showInkPile() {
     showModal('Ink Pile', inkCards);
 }
 
+function showOpponentDiscard(opponentId) {
+    const visibleCards = Object.values(gameState.visible_cards || {}).filter(card => 
+        card.owner === opponentId && card.zone === 'discard'
+    );
+    const opponent = gameState.players[opponentId];
+    showModal(opponent.username + "'s Discard Pile", visibleCards);
+}
+
+function showOpponentInk(opponentId) {
+    const visibleCards = Object.values(gameState.visible_cards || {}).filter(card => 
+        card.owner === opponentId && card.zone === 'ink' && card.face_up
+    );
+    const opponent = gameState.players[opponentId];
+    showModal(opponent.username + "'s Ink Pile", visibleCards);
+}
+
 // Modal functions
 function showModal(title, cards) {
     const modal = document.getElementById('pile-modal');
@@ -277,7 +470,7 @@ function showModal(title, cards) {
     
     cards.forEach(card => {
         if (card) {
-            const cardElement = createCardElement(card);
+            const cardElement = createCardElement(card, false);
             modalCards.appendChild(cardElement);
         }
     });
