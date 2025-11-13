@@ -13,9 +13,9 @@ class LorcanaAPI:
     BASE_URL = "https://api.lorcana-api.com"
     
     def __init__(self, use_mock=False):
-        self.cache = {}  # Cache cards to avoid repeated API calls
-        self.use_mock = use_mock  # Use mock data if API unavailable
-        self.all_cards = None  # Cache all cards
+        self.cache = {}
+        self.use_mock = use_mock
+        self.all_cards = None
     
     def fetch_all_cards(self):
         """Fetch all cards from the API and cache them"""
@@ -50,7 +50,7 @@ class LorcanaAPI:
                     break
                 
                 page += 1
-                time.sleep(0.5)  # Rate limiting
+                time.sleep(0.5)
             
             self.all_cards = all_cards
             print(f"Successfully cached {len(all_cards)} total cards")
@@ -71,10 +71,8 @@ class LorcanaAPI:
         if cache_key in self.cache:
             return self.cache[cache_key]
         
-        # Try API first
         if not self.use_mock:
             try:
-                # Method 1: Use strict search for exact match
                 full_name = f"{main_name} - {subtitle}"
                 response = requests.get(
                     f"{self.BASE_URL}/cards/fetch",
@@ -89,14 +87,20 @@ class LorcanaAPI:
                 if data and len(data) > 0:
                     card = data[0]
                     
-                    # Extract image URL from the card data
-                    image_url = None
-                    if 'Image' in card:
-                        image_url = card['Image']
-                    elif 'image' in card:
-                        image_url = card['image']
+                    # DEBUG: Print all available fields
+                    print(f"Card fields for {full_name}: {list(card.keys())}")
                     
-                    # Store in cache with image URL
+                    # Extract image URL - try multiple field names
+                    image_url = None
+                    for img_field in ['Image', 'image', 'image_url', 'Image_URL', 'card_image', 'art']:
+                        if img_field in card and card[img_field]:
+                            image_url = card[img_field]
+                            print(f"Found image at field '{img_field}': {image_url}")
+                            break
+                    
+                    if not image_url:
+                        print(f"WARNING: No image found for {full_name}")
+                    
                     card_info = {
                         'name': card.get('Name', main_name),
                         'subtitle': card.get('Subtitle', subtitle),
@@ -119,9 +123,7 @@ class LorcanaAPI:
                 
             except Exception as e:
                 print(f"API error for {main_name} - {subtitle}: {e}")
-                # Don't fall back to mock immediately, try search method
         
-        # Method 2: Try searching with just the main name
         if not self.use_mock:
             try:
                 response = requests.get(
@@ -134,7 +136,6 @@ class LorcanaAPI:
                 response.raise_for_status()
                 data = response.json()
                 
-                # Find the card with matching subtitle
                 for card in data:
                     if card.get('Subtitle', '').lower() == subtitle.lower():
                         image_url = card.get('Image') or card.get('image')
@@ -163,8 +164,7 @@ class LorcanaAPI:
                 print(f"Search API error for {main_name} - {subtitle}: {e}")
                 self.use_mock = True
         
-        # Use mock data as fallback
-        card_type = 'character'  # Default to character
+        card_type = 'character'
         if any(word in main_name.lower() for word in ['be our', 'fan the', 'cleansing', 'divebomb', 'on your']):
             card_type = 'action'
         elif any(word in main_name.lower() for word in ['lantern', 'hook', 'heart of', 'bell']):
@@ -190,10 +190,8 @@ class LorcanaAPI:
         if cache_key in self.cache:
             return self.cache[cache_key]
         
-        # Try API first
         if not self.use_mock:
             try:
-                # Search for card by exact name
                 response = requests.get(
                     f"{self.BASE_URL}/cards/fetch",
                     params={
@@ -207,8 +205,14 @@ class LorcanaAPI:
                 if data and len(data) > 0:
                     card = data[0]
                     
-                    # Extract image URL
-                    image_url = card.get('Image') or card.get('image')
+                    print(f"Card fields for {main_name}: {list(card.keys())}")
+                    
+                    image_url = None
+                    for img_field in ['Image', 'image', 'image_url', 'Image_URL', 'card_image', 'art']:
+                        if img_field in card and card[img_field]:
+                            image_url = card[img_field]
+                            print(f"Found image at field '{img_field}': {image_url}")
+                            break
                     
                     card_info = {
                         'name': card.get('Name', main_name),
@@ -231,7 +235,6 @@ class LorcanaAPI:
                 print(f"API error for {main_name}: {e}")
                 self.use_mock = True
         
-        # Mock fallback
         mock_card = {
             'name': main_name,
             'subtitle': '',
@@ -257,7 +260,6 @@ class LorcanaAPI:
             if not line:
                 continue
             
-            # Parse "X Card Name - Subtitle" or "X Card Name"
             parts = line.split(' ', 1)
             if len(parts) != 2:
                 continue
@@ -266,25 +268,20 @@ class LorcanaAPI:
                 count = int(parts[0])
                 full_name = parts[1]
                 
-                # Check if card has subtitle (character cards) or not (actions/items)
                 if ' - ' in full_name:
-                    # Character card with subtitle
                     main_name, subtitle = full_name.split(' - ', 1)
                     main_name = main_name.strip()
                     subtitle = subtitle.strip()
                 else:
-                    # Action/Item card without subtitle
                     main_name = full_name.strip()
                     subtitle = None
                 
-                # Fetch card from API
                 if subtitle:
                     card_data = self.search_card(main_name, subtitle)
                 else:
                     card_data = self.search_card_no_subtitle(main_name)
                 
                 if card_data:
-                    # Add card count times
                     for _ in range(count):
                         cards.append(card_data)
                     
@@ -294,7 +291,6 @@ class LorcanaAPI:
                         print(f"Added {count}x {main_name}" + (f" - {subtitle}" if subtitle else ""))
                 else:
                     print(f"Could not find card: {main_name}" + (f" - {subtitle}" if subtitle else ""))
-                    # Add a placeholder card so deck doesn't break
                     for _ in range(count):
                         cards.append({
                             'name': main_name,
@@ -311,7 +307,6 @@ class LorcanaAPI:
 
 
 if __name__ == "__main__":
-    # Test with your deck
     api = LorcanaAPI()
     
     test_deck = """
@@ -325,3 +320,9 @@ if __name__ == "__main__":
     for card in cards[:3]:
         print(f"  - {card.get('name')} - {card.get('subtitle', 'N/A')}")
         print(f"    Image: {card.get('image_url')}")
+```
+
+Now restart your server and **check the terminal output**. Look for lines like:
+```
+Card fields for Rapunzel - Gifted with Healing: ['Name', 'Subtitle', 'Image', ...]
+Found image at field 'Image': https://...
