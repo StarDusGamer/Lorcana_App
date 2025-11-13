@@ -1,295 +1,337 @@
-import requests
-import time
-from typing import Optional, Dict, List
+from flask import Flask, render_template, jsonify, request, session
+from flask_socketio import SocketIO, emit, join_room
+import uuid
+import os
+from game_state import GameState
+from lorcana_api import LorcanaAPI
 
-MOCK_CARD_IMAGES = {
-    'character': 'https://via.placeholder.com/250x350/4A90E2/FFFFFF?text=Character',
-    'action': 'https://via.placeholder.com/250x350/E27A3F/FFFFFF?text=Action',
-    'item': 'https://via.placeholder.com/250x350/45B7D1/FFFFFF?text=Item',
-}
+app = Flask(__name__, 
+            template_folder='../UI',
+            static_folder='../UI',
+            static_url_path='/static')
+app.config['SECRET_KEY'] = 'your-secret-key-here'
+socketio = SocketIO(app, cors_allowed_origins="*")
 
-class LorcanaAPI:
-    BASE_URL = "https://api.lorcana-api.com"
-    
-    def __init__(self, use_mock=False):
-        self.cache = {}
-        self.use_mock = use_mock
-        self.all_cards = None
-    
-    def fetch_all_cards(self):
-        if self.all_cards is not None:
-            return self.all_cards
-        
-        try:
-            print("Fetching all cards from Lorcana API...")
-            all_cards = []
-            page = 1
-            pagesize = 1000
-            
-            while True:
-                response = requests.get(
-                    f"{self.BASE_URL}/cards/all",
-                    params={"pagesize": pagesize, "page": page},
-                    timeout=10
-                )
-                response.raise_for_status()
-                data = response.json()
-                
-                if not data:
-                    break
-                
-                all_cards.extend(data)
-                print(f"Fetched page {page} ({len(data)} cards)")
-                
-                if len(data) < pagesize:
-                    break
-                
-                page += 1
-                time.sleep(0.5)
-            
-            self.all_cards = all_cards
-            print(f"Successfully cached {len(all_cards)} total cards")
-            return all_cards
-            
-        except Exception as e:
-            print(f"Error fetching all cards: {e}")
-            self.use_mock = True
-            return []
-    
-    def search_card(self, main_name: str, subtitle: str) -> Optional[Dict]:
-        cache_key = f"{main_name}|{subtitle}".lower()
-        
-        if cache_key in self.cache:
-            return self.cache[cache_key]
-        
-        if not self.use_mock:
-            try:
-                full_name = f"{main_name} - {subtitle}"
-                response = requests.get(
-                    f"{self.BASE_URL}/cards/fetch",
-                    params={"strict": full_name},
-                    timeout=5
-                )
-                response.raise_for_status()
-                data = response.json()
-                
-                if data and len(data) > 0:
-                    card = data[0]
-                    
-                    print(f"Card fields for {full_name}: {list(card.keys())}")
-                    
-                    image_url = None
-                    for img_field in ['Image', 'image', 'image_url', 'Image_URL', 'card_image', 'art']:
-                        if img_field in card and card[img_field]:
-                            image_url = card[img_field]
-                            print(f"Found image at field '{img_field}': {image_url}")
-                            break
-                    
-                    if not image_url:
-                        print(f"WARNING: No image found for {full_name}")
-                    
-                    card_info = {
-                        'name': card.get('Name', main_name),
-                        'subtitle': card.get('Subtitle', subtitle),
-                        'full_name': f"{main_name} - {subtitle}",
-                        'image_url': image_url,
-                        'cost': card.get('Cost'),
-                        'inkwell': card.get('Inkwell'),
-                        'type': card.get('Type'),
-                        'classification': card.get('Classifications'),
-                        'strength': card.get('Strength'),
-                        'willpower': card.get('Willpower'),
-                        'lore': card.get('Lore_Value'),
-                        'rarity': card.get('Rarity'),
-                        'set': card.get('Set_Name'),
-                        'card_num': card.get('Card_Num')
-                    }
-                    
-                    self.cache[cache_key] = card_info
-                    return card_info
-                
-            except Exception as e:
-                print(f"API error for {main_name} - {subtitle}: {e}")
-        
-        if not self.use_mock:
-            try:
-                response = requests.get(
-                    f"{self.BASE_URL}/cards/fetch",
-                    params={"search": f"name:{main_name}"},
-                    timeout=5
-                )
-                response.raise_for_status()
-                data = response.json()
-                
-                for card in data:
-                    if card.get('Subtitle', '').lower() == subtitle.lower():
-                        image_url = card.get('Image') or card.get('image')
-                        
-                        card_info = {
-                            'name': card.get('Name', main_name),
-                            'subtitle': card.get('Subtitle', subtitle),
-                            'full_name': f"{main_name} - {subtitle}",
-                            'image_url': image_url,
-                            'cost': card.get('Cost'),
-                            'inkwell': card.get('Inkwell'),
-                            'type': card.get('Type'),
-                            'classification': card.get('Classifications'),
-                            'strength': card.get('Strength'),
-                            'willpower': card.get('Willpower'),
-                            'lore': card.get('Lore_Value'),
-                            'rarity': card.get('Rarity'),
-                            'set': card.get('Set_Name'),
-                            'card_num': card.get('Card_Num')
-                        }
-                        
-                        self.cache[cache_key] = card_info
-                        return card_info
-                
-            except Exception as e:
-                print(f"Search API error for {main_name} - {subtitle}: {e}")
-                self.use_mock = True
-        
-        card_type = 'character'
-        if any(word in main_name.lower() for word in ['be our', 'fan the', 'cleansing', 'divebomb', 'on your']):
-            card_type = 'action'
-        elif any(word in main_name.lower() for word in ['lantern', 'hook', 'heart of', 'bell']):
-            card_type = 'item'
-        
-        mock_card = {
-            'name': main_name,
-            'subtitle': subtitle,
-            'full_name': f"{main_name} - {subtitle}",
-            'image_url': MOCK_CARD_IMAGES[card_type],
-            'mock': True
-        }
-        
-        self.cache[cache_key] = mock_card
-        return mock_card
-    
-    def search_card_no_subtitle(self, main_name: str) -> Optional[Dict]:
-        cache_key = f"{main_name}|NO_SUBTITLE".lower()
-        
-        if cache_key in self.cache:
-            return self.cache[cache_key]
-        
-        if not self.use_mock:
-            try:
-                response = requests.get(
-                    f"{self.BASE_URL}/cards/fetch",
-                    params={"strict": main_name},
-                    timeout=5
-                )
-                response.raise_for_status()
-                data = response.json()
-                
-                if data and len(data) > 0:
-                    card = data[0]
-                    
-                    print(f"Card fields for {main_name}: {list(card.keys())}")
-                    
-                    image_url = None
-                    for img_field in ['Image', 'image', 'image_url', 'Image_URL', 'card_image', 'art']:
-                        if img_field in card and card[img_field]:
-                            image_url = card[img_field]
-                            print(f"Found image at field '{img_field}': {image_url}")
-                            break
-                    
-                    card_info = {
-                        'name': card.get('Name', main_name),
-                        'subtitle': '',
-                        'full_name': main_name,
-                        'image_url': image_url,
-                        'cost': card.get('Cost'),
-                        'inkwell': card.get('Inkwell'),
-                        'type': card.get('Type'),
-                        'classification': card.get('Classifications'),
-                        'rarity': card.get('Rarity'),
-                        'set': card.get('Set_Name'),
-                        'card_num': card.get('Card_Num')
-                    }
-                    
-                    self.cache[cache_key] = card_info
-                    return card_info
-                    
-            except Exception as e:
-                print(f"API error for {main_name}: {e}")
-                self.use_mock = True
-        
-        mock_card = {
-            'name': main_name,
-            'subtitle': '',
-            'full_name': main_name,
-            'image_url': MOCK_CARD_IMAGES['action'],
-            'mock': True
-        }
-        
-        self.cache[cache_key] = mock_card
-        return mock_card
-    
-    def parse_dreamborn_deck(self, deck_text: str) -> List[Dict]:
-        cards = []
-        lines = deck_text.strip().split('\n')
-        
-        for line in lines:
-            line = line.strip()
-            if not line:
-                continue
-            
-            parts = line.split(' ', 1)
-            if len(parts) != 2:
-                continue
-            
-            try:
-                count = int(parts[0])
-                full_name = parts[1]
-                
-                if ' - ' in full_name:
-                    main_name, subtitle = full_name.split(' - ', 1)
-                    main_name = main_name.strip()
-                    subtitle = subtitle.strip()
-                else:
-                    main_name = full_name.strip()
-                    subtitle = None
-                
-                if subtitle:
-                    card_data = self.search_card(main_name, subtitle)
-                else:
-                    card_data = self.search_card_no_subtitle(main_name)
-                
-                if card_data:
-                    for _ in range(count):
-                        cards.append(card_data)
-                    
-                    if card_data.get('mock'):
-                        print(f"Added {count}x {main_name}" + (f" - {subtitle}" if subtitle else "") + " (MOCK)")
-                    else:
-                        print(f"Added {count}x {main_name}" + (f" - {subtitle}" if subtitle else ""))
-                else:
-                    print(f"Could not find card: {main_name}" + (f" - {subtitle}" if subtitle else ""))
-                    for _ in range(count):
-                        cards.append({
-                            'name': main_name,
-                            'subtitle': subtitle or '',
-                            'image_url': MOCK_CARD_IMAGES['action'],
-                            'error': True
-                        })
-                    
-            except ValueError as e:
-                print(f"Error parsing line: {line} - {e}")
-                continue
-        
-        return cards
+games = {}
+lorcana_api = LorcanaAPI()
 
-
-if __name__ == "__main__":
-    api = LorcanaAPI()
-    
-    test_deck = """2 Rapunzel - Gifted with Healing
+SAMPLE_DECK = """2 Rapunzel - Gifted with Healing
 3 Stitch - Carefree Surfer
-2 Be Our Guest"""
+2 Be Our Guest
+3 Lantern
+2 Maui - Hero to All
+1 Te Kā - The Burning One
+2 Fan the Flames
+2 Rapunzel - Gifted Artist
+2 Snow White - Lost in the Forest
+2 Snow White - Well Wisher
+4 Felicia - Always Hungry
+4 Mother Gothel - Withered and Wicked
+2 Teeth and Ambitions
+2 Dinner Bell
+4 Pluto - Determined Defender
+4 Pluto - Friendly Pooch
+2 Pongo - Determined Father
+4 Cleansing Rainwater
+2 Heart of Atlantis
+3 Maui - Whale
+2 Stitch - Little Rocket
+2 Divebomb
+2 On Your Feet! Now!
+2 Maui's Fish Hook"""
+
+
+@app.route('/')
+def index():
+    return render_template('game.html')
+
+
+@app.route('/test_game')
+def test_game():
+    """Create a test game with sample deck"""
+    try:
+        game_id = str(uuid.uuid4())
+        player_id = str(uuid.uuid4())
+        
+        print("Loading deck from API...")
+        deck_cards = lorcana_api.parse_dreamborn_deck(SAMPLE_DECK)
+        print(f"Loaded {len(deck_cards)} cards for player 1")
+        
+        game = GameState(game_id)
+        
+        print("Adding main player...")
+        game.add_player(player_id, "You", deck_cards)
+        
+        print("Adding opponent 1...")
+        opponent1_id = str(uuid.uuid4())
+        opponent1_deck = lorcana_api.parse_dreamborn_deck(SAMPLE_DECK)
+        print(f"Loaded {len(opponent1_deck)} cards for player 2")
+        game.add_player(opponent1_id, "Player 2", opponent1_deck)
+        
+        print("Adding opponent 2...")
+        opponent2_id = str(uuid.uuid4())
+        opponent2_deck = lorcana_api.parse_dreamborn_deck(SAMPLE_DECK)
+        print(f"Loaded {len(opponent2_deck)} cards for player 3")
+        game.add_player(opponent2_id, "Player 3", opponent2_deck)
+        
+        print("Starting game...")
+        game.start_game()
+        
+        games[game_id] = game
+        
+        session['game_id'] = game_id
+        session['player_id'] = player_id
+        
+        print("Game initialized successfully!")
+        
+        return jsonify({
+            'game_id': game_id,
+            'player_id': player_id,
+            'state': game.get_state_for_player(player_id)
+        })
+        
+    except Exception as e:
+        print(f"ERROR in test_game: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/game_state')
+def get_game_state():
+    """Get current game state"""
+    game_id = session.get('game_id')
+    player_id = session.get('player_id')
     
-    cards = api.parse_dreamborn_deck(test_deck)
-    print(f"\nLoaded {len(cards)} cards")
-    for card in cards[:3]:
-        print(f"  - {card.get('name')} - {card.get('subtitle', 'N/A')}")
-        print(f"    Image: {card.get('image_url')}")
+    if not game_id or game_id not in games:
+        return jsonify({'error': 'Game not found'}), 404
+    
+    game = games[game_id]
+    return jsonify(game.get_state_for_player(player_id))
+
+
+@socketio.on('connect')
+def handle_connect():
+    print('Client connected')
+
+
+@socketio.on('join_game')
+def handle_join_game(data):
+    game_id = data.get('game_id')
+    player_id = data.get('player_id')
+    
+    if game_id in games:
+        join_room(game_id)
+        emit('game_joined', {'game_id': game_id})
+
+
+@socketio.on('move_card')
+def handle_move_card(data):
+    game_id = session.get('game_id')
+    player_id = session.get('player_id')
+    
+    if game_id not in games:
+        return
+    
+    game = games[game_id]
+    card_id = data.get('card_id')
+    to_zone = data.get('to_zone')
+    face_up = data.get('face_up')
+    
+    if game.cards[card_id].owner != player_id:
+        emit('error', {'message': 'Not your card'})
+        return
+    
+    game.move_card(card_id, to_zone, face_up=face_up)
+    
+    for pid in game.players:
+        emit('game_update', game.get_state_for_player(pid), room=game_id)
+
+
+@socketio.on('ink_card')
+def handle_ink_card(data):
+    game_id = session.get('game_id')
+    player_id = session.get('player_id')
+    card_id = data.get('card_id')
+    
+    if game_id not in games:
+        return
+    
+    game = games[game_id]
+    if game.cards[card_id].owner != player_id:
+        return
+    
+    player = game.players[player_id]
+    if player.has_inked_this_turn:
+        emit('error', {'message': 'You have already inked a card this turn'})
+        return
+    
+    success = game.ink_card(card_id)
+    
+    if success:
+        for pid in game.players:
+            emit('game_update', game.get_state_for_player(pid), room=game_id)
+    else:
+        emit('error', {'message': 'Cannot ink card'})
+
+
+@socketio.on('play_card')
+def handle_play_card(data):
+    game_id = session.get('game_id')
+    player_id = session.get('player_id')
+    card_id = data.get('card_id')
+    
+    if game_id not in games:
+        return
+    
+    game = games[game_id]
+    if game.cards[card_id].owner != player_id:
+        return
+    
+    game.play_card(card_id)
+    
+    for pid in game.players:
+        emit('game_update', game.get_state_for_player(pid), room=game_id)
+
+
+@socketio.on('exert_card')
+def handle_exert_card(data):
+    game_id = session.get('game_id')
+    card_id = data.get('card_id')
+    
+    if game_id not in games:
+        return
+    
+    game = games[game_id]
+    game.exert_card(card_id)
+    
+    for pid in game.players:
+        emit('game_update', game.get_state_for_player(pid), room=game_id)
+
+
+@socketio.on('ready_card')
+def handle_ready_card(data):
+    game_id = session.get('game_id')
+    card_id = data.get('card_id')
+    
+    if game_id not in games:
+        return
+    
+    game = games[game_id]
+    game.ready_card(card_id)
+    
+    for pid in game.players:
+        emit('game_update', game.get_state_for_player(pid), room=game_id)
+
+
+@socketio.on('add_damage')
+def handle_add_damage(data):
+    game_id = session.get('game_id')
+    card_id = data.get('card_id')
+    
+    if game_id not in games:
+        return
+    
+    game = games[game_id]
+    game.add_damage(card_id, 1)
+    
+    for pid in game.players:
+        emit('game_update', game.get_state_for_player(pid), room=game_id)
+
+
+@socketio.on('remove_damage')
+def handle_remove_damage(data):
+    game_id = session.get('game_id')
+    card_id = data.get('card_id')
+    
+    if game_id not in games:
+        return
+    
+    game = games[game_id]
+    game.remove_damage(card_id, 1)
+    
+    for pid in game.players:
+        emit('game_update', game.get_state_for_player(pid), room=game_id)
+
+
+@socketio.on('draw_card')
+def handle_draw_card(data):
+    game_id = session.get('game_id')
+    player_id = session.get('player_id')
+    
+    if game_id not in games:
+        return
+    
+    game = games[game_id]
+    game.draw_cards(player_id, 1)
+    
+    for pid in game.players:
+        emit('game_update', game.get_state_for_player(pid), room=game_id)
+
+
+@socketio.on('shuffle_deck')
+def handle_shuffle_deck(data):
+    game_id = session.get('game_id')
+    player_id = session.get('player_id')
+    
+    if game_id not in games:
+        return
+    
+    game = games[game_id]
+    game.shuffle_deck(player_id)
+    
+    for pid in game.players:
+        emit('game_update', game.get_state_for_player(pid), room=game_id)
+
+
+@socketio.on('end_turn')
+def handle_end_turn(data):
+    game_id = session.get('game_id')
+    player_id = session.get('player_id')
+    
+    if game_id not in games:
+        return
+    
+    game = games[game_id]
+    game.end_turn(player_id)
+    
+    for pid in game.players:
+        emit('game_update', game.get_state_for_player(pid), room=game_id)
+
+
+@socketio.on('add_lore')
+def handle_add_lore(data):
+    game_id = session.get('game_id')
+    player_id = session.get('player_id')
+    amount = data.get('amount', 1)
+    
+    if game_id not in games:
+        return
+    
+    game = games[game_id]
+    game.add_lore(player_id, amount)
+    
+    for pid in game.players:
+        emit('game_update', game.get_state_for_player(pid), room=game_id)
+
+
+@socketio.on('flip_mystery_card')
+def handle_flip_mystery(data):
+    game_id = session.get('game_id')
+    player_id = session.get('player_id')
+    
+    if game_id not in games:
+        return
+    
+    game = games[game_id]
+    success = game.flip_mystery_card(player_id)
+    
+    if success:
+        for pid in game.players:
+            emit('game_update', game.get_state_for_player(pid), room=game_id)
+    else:
+        emit('error', {'message': 'Cannot flip mystery card yet (turn 3+)'})
+
+
+if __name__ == '__main__':
+    socketio.run(app, debug=True, host='0.0.0.0', port=5000, allow_unsafe_werkzeug=True)
