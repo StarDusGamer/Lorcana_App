@@ -14,14 +14,11 @@ window.addEventListener('DOMContentLoaded', async () => {
         }
         
         const data = await response.json();
-        console.log('Test game data received:', data);
+        console.log('Test game data received');
         
         gameId = data.game_id;
         playerId = data.player_id;
         gameState = data.state;
-        
-        console.log('Game ID:', gameId);
-        console.log('Player ID:', playerId);
         
         socket = io();
         
@@ -35,11 +32,25 @@ window.addEventListener('DOMContentLoaded', async () => {
         });
         
         socket.on('game_update', (newState) => {
-            console.log('Game update received');
-            gameState = newState;
-            renderGame();
-        });
-        
+    console.log('Game update received');
+    console.log('New state:', newState);
+    console.log('My player ID:', playerId);
+    
+    // Check if this update has data for me
+    if (!newState.my_cards || Object.keys(newState.my_cards).length === 0) {
+        console.warn('Update missing my_cards! Keeping old data.');
+        // Only update specific fields, keep my card data
+        if (newState.players) gameState.players = newState.players;
+        if (newState.current_turn !== undefined) gameState.current_turn = newState.current_turn;
+        if (newState.turn_number !== undefined) gameState.turn_number = newState.turn_number;
+        if (newState.visible_cards) gameState.visible_cards = newState.visible_cards;
+    } else {
+        // Full update with my cards - replace everything
+        gameState = newState;
+    }
+    
+    renderGame();
+});        
         socket.on('error', (data) => {
             console.error('Game error:', data);
             alert(data.message);
@@ -55,7 +66,14 @@ window.addEventListener('DOMContentLoaded', async () => {
 });
 
 function renderGame() {
-    if (!gameState) return;
+    if (!gameState) {
+        console.error('No game state to render!');
+        return;
+    }
+    
+    console.log('Rendering game with state:', gameState);
+    console.log('My player ID:', playerId);
+    console.log('Number of players:', Object.keys(gameState.players).length);
     
     const numPlayers = Object.keys(gameState.players).length;
     const gameLayout = document.getElementById('game-layout');
@@ -67,30 +85,88 @@ function renderGame() {
     
     renderYourBoard();
     renderOpponentBoards();
+    
+    console.log('Game render complete');
 }
 
 function renderYourBoard() {
+    console.log('renderYourBoard called');
     const yourArea = document.getElementById('your-area');
-    const myPlayer = gameState.players[playerId];
+    const myPlayerData = gameState.players[playerId];
     
-    // Always rebuild to avoid state issues
-    yourArea.innerHTML = '<div class="player-header"><h2>' + myPlayer.username + '</h2><div class="lore-counter">Lore: <span id="your-lore">' + myPlayer.lore + '</span> / 20</div></div><div class="zones-container"><div class="zone-container"><div class="zone-label">Ready Characters</div><div id="ready-zone" class="card-zone ready-zone"></div></div><div class="zone-container"><div class="zone-label">Summoning (Drying)</div><div id="summoning-zone" class="card-zone summoning-zone"></div></div><div id="piles-area"></div><div class="zone-container"><div class="zone-label">Your Hand</div><div id="hand-zone" class="card-zone hand-zone"></div></div></div>';
+    if (!myPlayerData) {
+        console.error('My player data not found! Player ID:', playerId);
+        console.error('Available players:', Object.keys(gameState.players));
+        return;
+    }
     
-    // Build piles area
+    console.log('My player data:', myPlayerData);
+    
+    // Get zones - they come from the player data
+    const myZones = myPlayerData.zones || {};
+    const myZoneCounts = myPlayerData.zone_counts || {};
+    
+    console.log('My zones:', myZones);
+    console.log('My zone counts:', myZoneCounts);
+    
+    yourArea.innerHTML = `
+        <div class="player-header">
+            <h2>${myPlayerData.username}</h2>
+            <div class="lore-counter">
+                Lore: <span id="your-lore">${myPlayerData.lore}</span> / 20
+            </div>
+        </div>
+        <div class="zones-container">
+            <div class="zone-container">
+                <div class="zone-label">Ready Characters</div>
+                <div id="ready-zone" class="card-zone ready-zone"></div>
+            </div>
+            <div class="zone-container">
+                <div class="zone-label">Summoning (Drying)</div>
+                <div id="summoning-zone" class="card-zone summoning-zone"></div>
+            </div>
+            <div id="piles-area"></div>
+            <div class="zone-container">
+                <div class="zone-label">Your Hand</div>
+                <div id="hand-zone" class="card-zone hand-zone"></div>
+            </div>
+        </div>
+    `;
+    
     const pilesArea = document.getElementById('piles-area');
-    pilesArea.innerHTML = '<div class="pile"><div class="pile-label">Deck</div><div class="pile-count">' + myPlayer.zone_counts.deck + '</div><div class="card-back"></div></div><div class="pile"><div class="pile-label">Mystery</div><div class="pile-count">' + myPlayer.zone_counts.mystery + '</div><div class="card-back"></div></div><div class="pile"><div class="pile-label">Discard</div><div class="pile-count">' + myPlayer.zone_counts.discard + '</div><div class="card-back discard-back"></div></div><div class="pile"><div class="pile-label">Ink</div><div class="pile-count">' + myPlayer.zone_counts.ink + '</div><div class="card-back ink-back"></div></div>';
+    pilesArea.innerHTML = `
+        <div class="pile">
+            <div class="pile-label">Deck</div>
+            <div class="pile-count">${myZoneCounts.deck || 0}</div>
+            <div class="card-back"></div>
+        </div>
+        <div class="pile">
+            <div class="pile-label">Mystery</div>
+            <div class="pile-count">${myZoneCounts.mystery || 0}</div>
+            <div class="card-back"></div>
+        </div>
+        <div class="pile">
+            <div class="pile-label">Discard</div>
+            <div class="pile-count">${myZoneCounts.discard || 0}</div>
+            <div class="card-back discard-back"></div>
+        </div>
+        <div class="pile">
+            <div class="pile-label">Ink</div>
+            <div class="pile-count">${myZoneCounts.ink || 0}</div>
+            <div class="card-back ink-back"></div>
+        </div>
+    `;
     
-    // Add click handlers to piles
     pilesArea.children[0].onclick = showDeckOptions;
     pilesArea.children[1].onclick = showMysteryOptions;
     pilesArea.children[2].onclick = showDiscardPile;
     pilesArea.children[3].onclick = showInkPile;
     
-    // Render zones
-    renderZone('hand-zone', myPlayer.zones.hand, true);
-    renderZone('ready-zone', myPlayer.zones.ready, true);
-    renderZone('summoning-zone', myPlayer.zones.summoning, true);
+    renderZone('hand-zone', myZones.hand || [], true);
+    renderZone('ready-zone', myZones.ready || [], true);
+    renderZone('summoning-zone', myZones.summoning || [], true);
 }
+
 function renderOpponentBoards() {
     const opponentsArea = document.getElementById('opponents-area');
     opponentsArea.innerHTML = '';
@@ -103,7 +179,48 @@ function renderOpponentBoards() {
         opponentDiv.className = 'player-area opponent';
         opponentDiv.id = 'opponent-' + opponentId;
         
-        opponentDiv.innerHTML = '<div class="player-header"><h2>' + opponent.username + '</h2><div class="lore-counter">Lore: ' + opponent.lore + ' / 20</div></div><div class="zones-container"><div class="zone-container"><div class="zone-label">Ready Characters</div><div id="opponent-ready-' + opponentId + '" class="card-zone ready-zone"></div></div><div class="zone-container"><div class="zone-label">Summoning (Drying)</div><div id="opponent-summoning-' + opponentId + '" class="card-zone summoning-zone"></div></div><div class="piles-area"><div class="pile"><div class="pile-label">Deck</div><div class="pile-count">' + opponent.zone_counts.deck + '</div><div class="card-back"></div></div><div class="pile"><div class="pile-label">Mystery</div><div class="pile-count">' + opponent.zone_counts.mystery + '</div><div class="card-back"></div></div><div class="pile" onclick="showOpponentDiscard(\'' + opponentId + '\')"><div class="pile-label">Discard</div><div class="pile-count">' + opponent.zone_counts.discard + '</div><div class="card-back discard-back"></div></div><div class="pile" onclick="showOpponentInk(\'' + opponentId + '\')"><div class="pile-label">Ink</div><div class="pile-count">' + opponent.zone_counts.ink + '</div><div class="card-back ink-back"></div></div></div><div class="zone-container"><div class="zone-label">Hand</div><div id="opponent-hand-' + opponentId + '" class="card-zone hand-zone"></div></div></div>';
+        opponentDiv.innerHTML = `
+            <div class="player-header">
+                <h2>${opponent.username}</h2>
+                <div class="lore-counter">Lore: ${opponent.lore} / 20</div>
+            </div>
+            <div class="zones-container">
+                <div class="zone-container">
+                    <div class="zone-label">Ready Characters</div>
+                    <div id="opponent-ready-${opponentId}" class="card-zone ready-zone"></div>
+                </div>
+                <div class="zone-container">
+                    <div class="zone-label">Summoning (Drying)</div>
+                    <div id="opponent-summoning-${opponentId}" class="card-zone summoning-zone"></div>
+                </div>
+                <div class="piles-area">
+                    <div class="pile">
+                        <div class="pile-label">Deck</div>
+                        <div class="pile-count">${opponent.zone_counts.deck}</div>
+                        <div class="card-back"></div>
+                    </div>
+                    <div class="pile">
+                        <div class="pile-label">Mystery</div>
+                        <div class="pile-count">${opponent.zone_counts.mystery}</div>
+                        <div class="card-back"></div>
+                    </div>
+                    <div class="pile" onclick="showOpponentDiscard('${opponentId}')">
+                        <div class="pile-label">Discard</div>
+                        <div class="pile-count">${opponent.zone_counts.discard}</div>
+                        <div class="card-back discard-back"></div>
+                    </div>
+                    <div class="pile" onclick="showOpponentInk('${opponentId}')">
+                        <div class="pile-label">Ink</div>
+                        <div class="pile-count">${opponent.zone_counts.ink}</div>
+                        <div class="card-back ink-back"></div>
+                    </div>
+                </div>
+                <div class="zone-container">
+                    <div class="zone-label">Hand</div>
+                    <div id="opponent-hand-${opponentId}" class="card-zone hand-zone"></div>
+                </div>
+            </div>
+        `;
         
         opponentsArea.appendChild(opponentDiv);
         
@@ -122,32 +239,32 @@ function renderZone(zoneId, cardIds, isYourCard) {
     
     zoneElement.innerHTML = '';
     
-    console.log('Rendering zone:', zoneId, 'with cards:', cardIds);
-    
-    if (!cardIds) {
-        console.warn('No cardIds provided for zone:', zoneId);
+    if (!cardIds || !Array.isArray(cardIds)) {
+        console.log('No cards or not an array for zone:', zoneId);
         return;
     }
     
-    if (!Array.isArray(cardIds)) {
-        console.error('cardIds is not an array for zone:', zoneId, 'got:', typeof cardIds, cardIds);
-        return;
-    }
+    console.log(`Rendering ${cardIds.length} cards in zone ${zoneId}`);
     
     cardIds.forEach(cardId => {
-        const card = gameState.my_cards[cardId];
+        // Try to find the card in my_cards first, then in visible_cards
+        let card = gameState.my_cards[cardId];
+        
         if (!card) {
-            console.warn('Card not found in my_cards:', cardId);
+            console.warn(`Card ${cardId} not found in my_cards, checking visible_cards`);
+            card = gameState.visible_cards ? gameState.visible_cards[cardId] : null;
+        }
+        
+        if (!card) {
+            console.error('Card not found:', cardId);
+            console.log('Available my_cards:', Object.keys(gameState.my_cards || {}));
             return;
         }
         
         const cardElement = createCardElement(card, isYourCard);
         zoneElement.appendChild(cardElement);
     });
-    
-    console.log('Zone', zoneId, 'rendered with', zoneElement.children.length, 'cards');
 }
-
 function renderOpponentZone(zoneId, opponentId, zoneName) {
     const zoneElement = document.getElementById(zoneId);
     if (!zoneElement) return;
@@ -344,13 +461,15 @@ function showMysteryOptions() {
 
 function showDiscardPile() {
     const myPlayer = gameState.players[playerId];
-    const discardCards = myPlayer.zones.discard.map(id => gameState.my_cards[id]);
+    const myZones = myPlayer.zones || {};
+    const discardCards = (myZones.discard || []).map(id => gameState.my_cards[id]).filter(c => c);
     showModal('Discard Pile', discardCards);
 }
 
 function showInkPile() {
     const myPlayer = gameState.players[playerId];
-    const inkCards = myPlayer.zones.ink.map(id => gameState.my_cards[id]);
+    const myZones = myPlayer.zones || {};
+    const inkCards = (myZones.ink || []).map(id => gameState.my_cards[id]).filter(c => c);
     showModal('Ink Pile', inkCards);
 }
 

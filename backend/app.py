@@ -7,8 +7,8 @@ from game_state import GameState
 from lorcana_api import LorcanaAPI
 
 app = Flask(__name__, 
-            template_folder='../UI',
-            static_folder='../UI',
+            template_folder='UI',
+            static_folder='UI',
             static_url_path='/static')
 app.config['SECRET_KEY'] = 'your-secret-key-here'
 socketio = SocketIO(app, cors_allowed_origins="*")
@@ -44,7 +44,99 @@ SAMPLE_DECK = """2 Rapunzel - Gifted with Healing
 
 @app.route('/')
 def index():
+    """Show welcome page with links to game and diagnostics"""
+    return """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Lorcana TCG Simulator</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                max-width: 800px;
+                margin: 50px auto;
+                padding: 20px;
+                background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+                color: white;
+            }
+            .container {
+                background: rgba(0, 0, 0, 0.3);
+                border-radius: 15px;
+                padding: 40px;
+                text-align: center;
+            }
+            h1 {
+                font-size: 48px;
+                margin-bottom: 10px;
+            }
+            .subtitle {
+                font-size: 20px;
+                color: #aaa;
+                margin-bottom: 40px;
+            }
+            .button {
+                display: inline-block;
+                background: #4CAF50;
+                color: white;
+                padding: 15px 30px;
+                margin: 10px;
+                text-decoration: none;
+                border-radius: 8px;
+                font-size: 18px;
+                transition: background 0.3s;
+            }
+            .button:hover {
+                background: #45a049;
+            }
+            .button.secondary {
+                background: #2196F3;
+            }
+            .button.secondary:hover {
+                background: #0b7dda;
+            }
+            .info {
+                margin-top: 40px;
+                padding-top: 20px;
+                border-top: 2px solid rgba(255, 255, 255, 0.2);
+                font-size: 14px;
+                color: #ccc;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🎴 Lorcana TCG Simulator</h1>
+            <div class="subtitle">Disney Lorcana Multiplayer Virtual Tabletop</div>
+            
+            <a href="/game" class="button">🚀 Launch Game (3 Players)</a>
+            <br>
+            <a href="/diagnostics" class="button secondary">🔧 Run Diagnostics</a>
+            
+            <div class="info">
+                <p><strong>Quick Start:</strong></p>
+                <p>Click "Launch Game" to immediately start a 3-player game with sample decks</p>
+                <p>Or click "Run Diagnostics" to test your setup</p>
+                <br>
+                <p><strong>Features:</strong></p>
+                <p>✓ Real-time multiplayer (2-4 players) • ✓ Full game mechanics<br>
+                ✓ Card images from Lorcana API • ✓ Interactive UI</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+
+
+@app.route('/game')
+def game():
+    """Serve the game HTML page"""
     return render_template('game.html')
+
+
+@app.route('/diagnostics')
+def diagnostics():
+    """Serve the diagnostics page"""
+    return render_template('diagnostics.html')
 
 
 @app.route('/test_game')
