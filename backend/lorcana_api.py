@@ -44,15 +44,19 @@ class LorcanaAPI:
                         'full_name': f"{main_name} - {subtitle}",
                         'image_url': image_url,
                         'cost': card.get('Cost'),
-                        'inkwell': card.get('Inkwell'),
+                        'inkwell': card.get('Inkable'),
                         'type': card.get('Type'),
                         'classification': card.get('Classifications'),
+                        'color': card.get('Color'),
                         'strength': card.get('Strength'),
                         'willpower': card.get('Willpower'),
-                        'lore': card.get('Lore_Value'),
+                        'lore': card.get('Lore_Value') or card.get('Lore'),
+                        'abilities': card.get('Body_Text'),
+                        'flavor_text': card.get('Flavor_Text'),
                         'rarity': card.get('Rarity'),
                         'set': card.get('Set_Name'),
-                        'card_num': card.get('Card_Num')
+                        'card_num': card.get('Card_Num'),
+                        'artist': card.get('Artist')
                     }
                     
                     self.cache[cache_key] = card_info
@@ -68,7 +72,10 @@ class LorcanaAPI:
             'subtitle': subtitle,
             'full_name': f"{main_name} - {subtitle}",
             'image_url': MOCK_CARD_IMAGES[card_type],
-            'mock': True
+            'mock': True,
+            'cost': 3,
+            'inkwell': True,
+            'type': 'Character'
         }
         
         self.cache[cache_key] = mock_card
@@ -101,12 +108,16 @@ class LorcanaAPI:
                         'full_name': main_name,
                         'image_url': image_url,
                         'cost': card.get('Cost'),
-                        'inkwell': card.get('Inkwell'),
+                        'inkwell': card.get('Inkable'),
                         'type': card.get('Type'),
                         'classification': card.get('Classifications'),
+                        'color': card.get('Color'),
                         'rarity': card.get('Rarity'),
+                        'abilities': card.get('Body_Text'),
+                        'flavor_text': card.get('Flavor_Text'),
                         'set': card.get('Set_Name'),
-                        'card_num': card.get('Card_Num')
+                        'card_num': card.get('Card_Num'),
+                        'artist': card.get('Artist')
                     }
                     
                     self.cache[cache_key] = card_info
@@ -121,7 +132,10 @@ class LorcanaAPI:
             'subtitle': '',
             'full_name': main_name,
             'image_url': MOCK_CARD_IMAGES['action'],
-            'mock': True
+            'mock': True,
+            'cost': 2,
+            'inkwell': True,
+            'type': 'Action'
         }
         
         self.cache[cache_key] = mock_card
@@ -164,7 +178,8 @@ class LorcanaAPI:
                     if card_data.get('mock'):
                         print(f"Added {count}x {main_name}" + (f" - {subtitle}" if subtitle else "") + " (MOCK)")
                     else:
-                        print(f"Added {count}x {main_name}" + (f" - {subtitle}" if subtitle else ""))
+                        inkwell_status = "✓ Inkable" if card_data.get('inkwell') else "✗ Not Inkable"
+                        print(f"Added {count}x {main_name}" + (f" - {subtitle}" if subtitle else "") + f" [{inkwell_status}]")
                 else:
                     print(f"Could not find card: {main_name}" + (f" - {subtitle}" if subtitle else ""))
                     for _ in range(count):
@@ -172,7 +187,10 @@ class LorcanaAPI:
                             'name': main_name,
                             'subtitle': subtitle or '',
                             'image_url': MOCK_CARD_IMAGES['action'],
-                            'error': True
+                            'error': True,
+                            'cost': 1,
+                            'inkwell': True,
+                            'type': 'Character'
                         })
                     
             except ValueError as e:
@@ -180,3 +198,28 @@ class LorcanaAPI:
                 continue
         
         return cards
+
+
+def test_api_response():
+    """Test function to see all available fields from API"""
+    api = LorcanaAPI()
+    
+    # Test with a well-known card
+    test_card = api.search_card("Rapunzel", "Gifted with Healing")
+    
+    if test_card and not test_card.get('mock'):
+        print("\n=== FULL API RESPONSE ===")
+        print("Available fields from Lorcana API:")
+        for key, value in test_card.items():
+            print(f"  {key}: {value}")
+        print("=========================\n")
+    else:
+        print("Could not fetch from API (using mock data)")
+        if test_card:
+            print("Mock data fields:")
+            for key, value in test_card.items():
+                print(f"  {key}: {value}")
+
+
+if __name__ == "__main__":
+    test_api_response()

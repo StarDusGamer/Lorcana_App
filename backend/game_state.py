@@ -151,22 +151,94 @@ class GameState:
         if to_zone in ['hand', 'deck', 'discard', 'ink']:
             card.exerted = False
     
-    def ink_card(self, card_id: str):
-        """Ink a card - move to ink zone face up"""
+    def can_ink_card(self, card_id: str):
+        """Check if a card can be inked. Returns (can_ink, error_message)"""
         card = self.cards[card_id]
         player = self.players[card.owner]
         
         if player.has_inked_this_turn:
-            return False
+            return False, "Already inked a card this turn"
         
-        self.move_card(card_id, 'ink', face_up=True)
+        if card.zone != 'hand':
+            return False, "Card must be in hand to ink"
+        
+        inkwell = card.card_data.get('inkwell')
+        
+        has_inkwell = False
+        if isinstance(inkwell, bool):
+            has_inkwell = inkwell
+        elif isinstance(inkwell, str):
+            has_inkwell = inkwell.lower() in ['true', 'yes', '1']
+        elif isinstance(inkwell, int):
+            has_inkwell = inkwell == 1
+        
+        if not has_inkwell:
+            return False, "This card cannot be inked (no inkwell)"
+        
+        return True, ""
+    
+    def ink_card(self, card_id: str):
+        """Ink a card - move to ink zone face down (dried)"""
+        can_ink, error_msg = self.can_ink_card(card_id)
+        
+        if not can_ink:
+            return False, error_msg
+        
+        card = self.cards[card_id]
+        player = self.players[card.owner]
+        
+        self.move_card(card_id, 'ink', face_up=False)
         player.has_inked_this_turn = True
-        return True
+        return True, ""
+    
+    def can_play_card(self, card_id: str):
+        """Check if a card can be played. Returns (can_play, error_message)"""
+        card = self.cards[card_id]
+        player = self.players[card.owner]
+        
+        if card.zone != 'hand':
+            return False, "Card must be in hand to play"
+        
+        cost = card.card_data.get('cost')
+        if cost is None:
+            cost = 0
+        
+        available_ink = sum(1 for ink_card_id in player.zones['ink'] 
+                           if not self.cards[ink_card_id].face_up)
+        
+        if available_ink < cost:
+            return False, f"Not enough ink. Need {cost}, have {available_ink}"
+        
+        return True, ""
+    
+    def spend_ink(self, player_id: str, amount: int):
+        """Spend (flip face-up) ink cards"""
+        player = self.players[player_id]
+        spent = 0
+        
+        for ink_card_id in player.zones['ink']:
+            if spent >= amount:
+                break
+            if not self.cards[ink_card_id].face_up:
+                self.cards[ink_card_id].face_up = True
+                spent += 1
     
     def play_card(self, card_id: str):
-        """Play a card from hand to summoning area"""
-        self.move_card(card_id, 'summoning', face_up=True)
-        self.cards[card_id].exerted = False
+        """Play a card from hand - goes to appropriate zone based on type"""
+        card = self.cards[card_id]
+        card_type = card.card_data.get('type', '').lower()
+        cost = card.card_data.get('cost', 0) or 0
+        
+        self.spend_ink(card.owner, cost)
+        
+        if card_type == 'action':
+            self.move_card(card_id, 'discard', face_up=True)
+        elif card_type == 'item' or card_type == 'location':
+            self.move_card(card_id, 'ready', face_up=True)
+            self.cards[card_id].exerted = False
+        else:
+            self.move_card(card_id, 'summoning', face_up=True)
+            self.cards[card_id].exerted = False
     
     def exert_card(self, card_id: str):
         """Exert (tap) a card"""

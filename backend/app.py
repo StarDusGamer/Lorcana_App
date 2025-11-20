@@ -1,4 +1,3 @@
-#Main App File (Use Proper Indentation)
 from flask import Flask, render_template, jsonify, request, session
 from flask_socketio import SocketIO, emit, join_room
 import uuid
@@ -7,14 +6,16 @@ from game_state import GameState
 from lorcana_api import LorcanaAPI
 
 app = Flask(__name__, 
-            template_folder='UI',
-            static_folder='UI',
+            template_folder='../UI',
+            static_folder='../UI',
             static_url_path='/static')
 app.config['SECRET_KEY'] = 'your-secret-key-here'
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 games = {}
 lorcana_api = LorcanaAPI()
+
+player_sessions = {}
 
 SAMPLE_DECK = """2 Rapunzel - Gifted with Healing
 3 Stitch - Carefree Surfer
@@ -44,7 +45,6 @@ SAMPLE_DECK = """2 Rapunzel - Gifted with Healing
 
 @app.route('/')
 def index():
-    """Show welcome page with links to game and diagnostics"""
     return """
     <!DOCTYPE html>
     <html>
@@ -88,12 +88,6 @@ def index():
             .button:hover {
                 background: #45a049;
             }
-            .button.secondary {
-                background: #2196F3;
-            }
-            .button.secondary:hover {
-                background: #0b7dda;
-            }
             .info {
                 margin-top: 40px;
                 padding-top: 20px;
@@ -109,13 +103,10 @@ def index():
             <div class="subtitle">Disney Lorcana Multiplayer Virtual Tabletop</div>
             
             <a href="/game" class="button">🚀 Launch Game (3 Players)</a>
-            <br>
-            <a href="/diagnostics" class="button secondary">🔧 Run Diagnostics</a>
             
             <div class="info">
                 <p><strong>Quick Start:</strong></p>
                 <p>Click "Launch Game" to immediately start a 3-player game with sample decks</p>
-                <p>Or click "Run Diagnostics" to test your setup</p>
                 <br>
                 <p><strong>Features:</strong></p>
                 <p>✓ Real-time multiplayer (2-4 players) • ✓ Full game mechanics<br>
@@ -129,19 +120,11 @@ def index():
 
 @app.route('/game')
 def game():
-    """Serve the game HTML page"""
     return render_template('game.html')
-
-
-@app.route('/diagnostics')
-def diagnostics():
-    """Serve the diagnostics page"""
-    return render_template('diagnostics.html')
 
 
 @app.route('/test_game')
 def test_game():
-    """Create a test game with sample deck"""
     try:
         game_id = str(uuid.uuid4())
         player_id = str(uuid.uuid4())
@@ -192,7 +175,6 @@ def test_game():
 
 @app.route('/game_state')
 def get_game_state():
-    """Get current game state"""
     game_id = session.get('game_id')
     player_id = session.get('player_id')
     
@@ -203,9 +185,26 @@ def get_game_state():
     return jsonify(game.get_state_for_player(player_id))
 
 
+def broadcast_game_update(game, game_id):
+    for pid in game.players:
+        if pid in player_sessions:
+            socketio.emit('game_update', 
+                         game.get_state_for_player(pid), 
+                         room=player_sessions[pid])
+
+
 @socketio.on('connect')
 def handle_connect():
-    print('Client connected')
+    print(f'Client connected: {request.sid}')
+
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    print(f'Client disconnected: {request.sid}')
+    for pid, sid in list(player_sessions.items()):
+        if sid == request.sid:
+            del player_sessions[pid]
+            print(f'Removed player session: {pid}')
 
 
 @socketio.on('join_game')
@@ -215,6 +214,8 @@ def handle_join_game(data):
     
     if game_id in games:
         join_room(game_id)
+        player_sessions[player_id] = request.sid
+        print(f'Player {player_id} joined with session {request.sid}')
         emit('game_joined', {'game_id': game_id})
 
 
@@ -236,9 +237,7 @@ def handle_move_card(data):
         return
     
     game.move_card(card_id, to_zone, face_up=face_up)
-    
-    for pid in game.players:
-        emit('game_update', game.get_state_for_player(pid), room=game_id)
+    broadcast_game_update(game, game_id)
 
 
 @socketio.on('ink_card')
@@ -252,20 +251,15 @@ def handle_ink_card(data):
     
     game = games[game_id]
     if game.cards[card_id].owner != player_id:
+        emit('error', {'message': 'Not your card'})
         return
     
-    player = game.players[player_id]
-    if player.has_inked_this_turn:
-        emit('error', {'message': 'You have already inked a card this turn'})
-        return
-    
-    success = game.ink_card(card_id)
+    success, error_msg = game.ink_card(card_id)
     
     if success:
-        for pid in game.players:
-            emit('game_update', game.get_state_for_player(pid), room=game_id)
+        broadcast_game_update(game, game_id)
     else:
-        emit('error', {'message': 'Cannot ink card'})
+        emit('error', {'message': error_msg})
 
 
 @socketio.on('play_card')
@@ -279,12 +273,16 @@ def handle_play_card(data):
     
     game = games[game_id]
     if game.cards[card_id].owner != player_id:
+        emit('error', {'message': 'Not your card'})
+        return
+    
+    can_play, error_msg = game.can_play_card(card_id)
+    if not can_play:
+        emit('error', {'message': error_msg})
         return
     
     game.play_card(card_id)
-    
-    for pid in game.players:
-        emit('game_update', game.get_state_for_player(pid), room=game_id)
+    broadcast_game_update(game, game_id)
 
 
 @socketio.on('exert_card')
@@ -297,9 +295,7 @@ def handle_exert_card(data):
     
     game = games[game_id]
     game.exert_card(card_id)
-    
-    for pid in game.players:
-        emit('game_update', game.get_state_for_player(pid), room=game_id)
+    broadcast_game_update(game, game_id)
 
 
 @socketio.on('ready_card')
@@ -312,9 +308,7 @@ def handle_ready_card(data):
     
     game = games[game_id]
     game.ready_card(card_id)
-    
-    for pid in game.players:
-        emit('game_update', game.get_state_for_player(pid), room=game_id)
+    broadcast_game_update(game, game_id)
 
 
 @socketio.on('add_damage')
@@ -327,9 +321,7 @@ def handle_add_damage(data):
     
     game = games[game_id]
     game.add_damage(card_id, 1)
-    
-    for pid in game.players:
-        emit('game_update', game.get_state_for_player(pid), room=game_id)
+    broadcast_game_update(game, game_id)
 
 
 @socketio.on('remove_damage')
@@ -342,9 +334,7 @@ def handle_remove_damage(data):
     
     game = games[game_id]
     game.remove_damage(card_id, 1)
-    
-    for pid in game.players:
-        emit('game_update', game.get_state_for_player(pid), room=game_id)
+    broadcast_game_update(game, game_id)
 
 
 @socketio.on('draw_card')
@@ -357,9 +347,7 @@ def handle_draw_card(data):
     
     game = games[game_id]
     game.draw_cards(player_id, 1)
-    
-    for pid in game.players:
-        emit('game_update', game.get_state_for_player(pid), room=game_id)
+    broadcast_game_update(game, game_id)
 
 
 @socketio.on('shuffle_deck')
@@ -372,9 +360,7 @@ def handle_shuffle_deck(data):
     
     game = games[game_id]
     game.shuffle_deck(player_id)
-    
-    for pid in game.players:
-        emit('game_update', game.get_state_for_player(pid), room=game_id)
+    broadcast_game_update(game, game_id)
 
 
 @socketio.on('end_turn')
@@ -387,9 +373,7 @@ def handle_end_turn(data):
     
     game = games[game_id]
     game.end_turn(player_id)
-    
-    for pid in game.players:
-        emit('game_update', game.get_state_for_player(pid), room=game_id)
+    broadcast_game_update(game, game_id)
 
 
 @socketio.on('add_lore')
@@ -403,9 +387,7 @@ def handle_add_lore(data):
     
     game = games[game_id]
     game.add_lore(player_id, amount)
-    
-    for pid in game.players:
-        emit('game_update', game.get_state_for_player(pid), room=game_id)
+    broadcast_game_update(game, game_id)
 
 
 @socketio.on('flip_mystery_card')
@@ -420,8 +402,7 @@ def handle_flip_mystery(data):
     success = game.flip_mystery_card(player_id)
     
     if success:
-        for pid in game.players:
-            emit('game_update', game.get_state_for_player(pid), room=game_id)
+        broadcast_game_update(game, game_id)
     else:
         emit('error', {'message': 'Cannot flip mystery card yet (turn 3+)'})
 
